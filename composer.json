@@ -1,0 +1,23 @@
+{
+    "name": "ynrzxka/interface-auth-token",
+    "description": "interface-auth-token",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "NuoCoo",
+            "email": "nuocoo@163.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "ynrzxka\\Iat\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {"ynrzxka\\Iat\\": "tests/"}
+    }
+}
+
