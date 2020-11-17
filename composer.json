@@ -14,11 +14,11 @@
     "require": {},
     "autoload": {
         "psr-4": {
-            "ynrzxka\\Iat\\": "src/"
+            "interfaceAuthToken\\Iat\\": "src/"
         }
     },
     "autoload-dev": {
-        "psr-4": {"ynrzxka\\Iat\\": "tests/"}
+        "psr-4": {"interfaceAuthToken\\Iat\\": "tests/"}
     }
 }
 
