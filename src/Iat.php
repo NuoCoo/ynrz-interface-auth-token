@@ -1,16 +1,15 @@
 <?php
+
 /*
  * 接口认证令牌 Interface authentication token
  *
 */
-
-namespace interfaceAuthToken\Iat;
+namespace interfaceAuthToken;
 
 use App\Master\Framework\Extend\Core;
 use Illuminate\Http\Request;
 
-class Iat
-{
+class Iat {
 
     private static $instance = null;
 
@@ -35,7 +34,7 @@ class Iat
         self::user();
     }
 
-    public static function getInstance($guard = 'app')
+    public static function getInstance($guard  = 'app')
     {
         if (!isset(self::$instance))
         {
@@ -47,31 +46,31 @@ class Iat
 
     public static function json($code = 200, $msg = 'success', $result = [])
     {
-        if (!self::$_Users || !isset(self::$_Users['Iat']))
+        if(!self::$_Users || !isset(self::$_Users['Iat']))
         {
-            return response()->json(['code' => $code, 'msg' => $msg, 'result' => $result], 200, []);
+            return response()->json(['code' => $code, 'msg' =>$msg, 'result' => $result], 200, []);
         }
 
-        if (!self::$_Users['Iat']['refresh'])
+        if(!self::$_Users['Iat']['refresh'])
         {
-            return response()->json(['code' => $code, 'msg' => $msg, 'result' => $result], 200, [
+            return response()->json(['code' => $code, 'msg' =>$msg, 'result' => $result], 200, [
                 'authorization' => self::$_Users['Iat']['authorization'],
-                'hash' => self::$_Users['Iat']['hash']
+                'hash'          => self::$_Users['Iat']['hash']
             ]);
         }
 
         $iat = self::refresh(self::$_Users['Iat']['iat_auth']);
 
-        return response()->json(['code' => $code, 'msg' => $msg, 'result' => $result], 200, $iat);
+        return response()->json(['code' => $code, 'msg' =>$msg, 'result' => $result], 200, $iat);
     }
 
     public static function login($data)
     {
-        $response = ['hash' => '', 'authorization' => ''];
+        $response = ['hash'=>'', 'authorization'=>''];
 
-        $authorization_iv = self::random(8);
+        $authorization_iv = self::random(16);
 
-        $params = time() . '|' . $authorization_iv . '|' . isset(self::$_config['refresh'])?self::$_config['refresh']:0;
+        $params = time().'|'.$authorization_iv.'|'.isset(self::$_config['refresh'])?self::$_config['refresh']:0;
 
         $response['hash'] = self::encrypt($params, self::$_Key, self::$_Iv);
 
@@ -82,8 +81,10 @@ class Iat
 
     public static function refresh($data = [])
     {
-        if (!is_array($data) || empty($data)) {
-            if (!self::$_Users['Iat']['iat_auth']) {
+        if(!is_array($data) || empty($data))
+        {
+            if(!self::$_Users['Iat']['iat_auth'])
+            {
                 self::setError(9050, 'IAT refresh failed, missing refresh data');
                 return false;
             } else {
@@ -96,79 +97,97 @@ class Iat
 
     public static function user()
     {
-        if (!$authorization = Request::capture()->header('authorization'))
+        if(!$authorization = Request::capture()->header('authorization'))
         {
-            self::setError(91001, 'The authorization parameter is missing');
+            self::setError(9001, 'The authorization parameter is missing');
             return false;
         }
 
-        if (!$hash = Request::capture()->header('hash'))
+        if(!$hash = Request::capture()->header('hash'))
         {
-            self::setError(91002, 'Missing hash parameter');
+            self::setError(9002, 'Missing hash parameter');
             return false;
         }
 
-        if (self::$_Users && isset(self::$_Users['Iat']) && isset(self::$_Users['Iat']['iat_auth']))
+        if(self::$_Users && isset(self::$_Users['Iat']) && isset(self::$_Users['Iat']['iat_auth']))
         {
-            if (!isset(self::$_Users['Iat']['iat_auth']['id']))
+            if(!isset(self::$_Users['Iat']['iat_auth']['id']))
             {
-                self::setError(91003, 'Failed to obtain user information');
+                self::setError(9006, 'Failed to obtain user information');
                 return false;
             }
-            if (!$users = self::$_config['model']::where(['id' => self::$_Users['Iat']['iat_auth']['id']])->first())
+            if(!$users = self::$_config['model']::where(['id'=>self::$_Users['Iat']['iat_auth']['id'], 'status'=>1])->first())
             {
-                self::setError(91004, 'Failed to obtain user information');
+                self::setError(9006, 'Failed to obtain user information');
                 return false;
+            }
+            if(isset($users['hash']))
+            {
+                if($users['hash'] != self::$_Users['Iat']['iat_auth']['hash'])
+                {
+                    self::setError(9006, 'Failed to obtain user information');
+                    return false;
+                }
             }
 
             return $users;
         }
 
-        if (!$iat_hash = self::decrypt($hash, self::$_Key, self::$_Iv))
+        if(!$iat_hash = self::decrypt($hash, self::$_Key, self::$_Iv))
         {
-            self::setError(91005, 'Hash decryption failed');
+            self::setError(9003, 'Hash decryption failed');
             return false;
         }
 
         $hash_params = explode('|', $iat_hash);
 
 
-        if (isset($hash_params[2]) && $hash_params[2])
+        if(isset($hash_params[2]) && $hash_params[2])
         {
-            if (time() > (self::$_config['expire'] * 86400) + $hash_params[0])
+            if(time() > (self::$_config['expire']*86400) + $hash_params[0])
             {
-                self::setError(91006, 'Authorization decryption failed');
+                self::setError(90041, 'Authorization decryption failed');
                 return false;
             }
-            if (time() > ($hash_params[0] + $hash_params[2]))
+            if(time() > ($hash_params[0] + $hash_params[2]))
             {
                 self::$_Users['Iat']['refresh'] = true;
             }
         }
 
-        if (!isset($hash_params[1]) || !$hash_params[1])
+        if(!isset($hash_params[1]) || empty($hash_params[1]))
         {
             $hash_params[1] = self::$_Iv;
         }
 
-        if (!$iat_authorization = self::decrypt($authorization, self::$_Key, $hash_params[1]))
+        if(!$iat_authorization = self::decrypt($authorization, self::$_Key, $hash_params[1]))
         {
             self::setError(9004, 'Authorization decryption failed');
             return false;
         }
 
-        if (!isset($iat_authorization['id']))
+        if(!isset($iat_authorization['id']))
         {
             self::setError(9005, 'User unique id not set');
             return false;
         }
 
-        if (!$users = self::$_config['model']::where(['id' => $iat_authorization['id']])->first())
+        if(!$users = self::$_config['model']::where(['id'=>$iat_authorization['id'],'status'=>1])->first())
         {
             self::setError(9006, 'Failed to obtain user information');
             return false;
         }
+        if(isset($users['hash']))
+        {
+            if($users['hash'] != $iat_authorization['hash'])
+            {
+                self::setError(9006, 'Failed to obtain user information');
+                return false;
+            }
+        }
+
         self::$_Users = $users->toArray();
+
         self::$_Users['Iat'] = [
             'refresh'       => false,
             'authorization' => $authorization,
@@ -181,14 +200,14 @@ class Iat
 
     public static function check()
     {
-        if (self::$_Users['Iat'] && isset(self::$_Users['Iat']['iat_auth']))
+        if(self::$_Users['Iat'] && isset(self::$_Users['Iat']['iat_auth']))
         {
-            if (!isset(self::$_Users['Iat']['iat_auth']['id']))
+            if(!isset(self::$_Users['Iat']['iat_auth']['id']))
             {
                 return false;
             }
 
-            return self::$_config['model']::where(['id' => self::$_Users['Iat']['iat_auth']['id']])->exists();
+            return self::$_config['model']::where(['id'=>self::$_Users['Iat']['iat_auth']['id'],'status'=>1])->exists();
         } else {
             return self::user() ? true : false;
         }
@@ -196,29 +215,37 @@ class Iat
 
     public static function loginUser()
     {
-        if (!$authorization = Request::capture()->header('authorization'))
+        if(!$authorization = Request::capture()->header('authorization'))
         {
             Core::jsonResponse(91110, '用户信息认证失败，请重新登录！');
             return false;
         }
 
-        if (!$hash = Request::capture()->header('hash'))
+        if(!$hash = Request::capture()->header('hash'))
         {
             Core::jsonResponse(91110, '用户信息认证失败，请重新登录！');
             return false;
         }
 
-        if (self::$_Users && isset(self::$_Users['Iat']) && isset(self::$_Users['Iat']['iat_auth']))
+        if(self::$_Users && isset(self::$_Users['Iat']) && isset(self::$_Users['Iat']['iat_auth']))
         {
-            if (!$users = self::$_config['model']::where(['id' => self::$_Users['Iat']['iat_auth']['id']])->first())
+            if(!$users = self::$_config['model']::where(['id'=>self::$_Users['Iat']['iat_auth']['id'],'status'=>1])->first())
             {
                 Core::jsonResponse(91110, '用户信息认证失败，请重新登录！');
                 return false;
             }
+            if(isset($users['hash']))
+            {
+                if($users['hash'] != self::$_Users['Iat']['iat_auth']['hash'])
+                {
+                    self::setError(91110, 'Failed to obtain user information');
+                    return false;
+                }
+            }
             return $users;
         }
 
-        if (!$users = self::user())
+        if(!$users = self::user())
         {
             Core::jsonResponse(91110, '用户信息认证失败，请重新登录！');
         }
@@ -239,7 +266,8 @@ class Iat
 
         $max = strlen($chars) - 1;
 
-        for ($i = 0; $i < $length; $i++) {
+        for ($i = 0; $i < $length; $i++)
+        {
             $hash .= $chars[mt_rand(0, $max)];
         }
 
@@ -277,7 +305,7 @@ class Iat
 
         $iv = $iv ? $iv : self::$_Iv;
 
-        $decrypted = openssl_decrypt(base64_decode($data), 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+        $decrypted = openssl_decrypt(base64_decode($data),'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
 
         $json_str = rtrim($decrypted, "\0");
 
@@ -286,7 +314,7 @@ class Iat
 
     private static function setError($code, $msg, $res = '')
     {
-        self::$_Message = ['code' => $code, 'msg' => $msg, 'res' => $res];
+        self::$_Message = ['code'=>$code, 'msg'=>$msg, 'res'=>$res];
         return true;
     }
 
@@ -296,5 +324,3 @@ class Iat
     }
 
 }
-
-
