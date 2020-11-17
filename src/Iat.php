@@ -70,7 +70,7 @@ class Iat {
 
         $authorization_iv = self::random(16);
 
-        $params = time().'|'.$authorization_iv.'|'.isset(self::$_config['refresh'])?self::$_config['refresh']:0;
+        $params = time().'|'.$authorization_iv.'|'.(isset(self::$_config['refresh'])?self::$_config['refresh']:0);
 
         $response['hash'] = self::encrypt($params, self::$_Key, self::$_Iv);
 
